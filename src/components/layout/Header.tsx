@@ -11,15 +11,21 @@ import {
   LogOut,
   Settings,
   Package,
+  Bell,
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useCart } from '../../contexts/CartContext'
+import { useWishlist } from '../../contexts/WishlistContext'
+import { useNotifications } from '../../contexts/NotificationContext'
 
 const Header: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
-  const { user, userProfile, signOut } = useAuth()
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false)
+  const { user, signOut } = useAuth()
   const { getTotalItems } = useCart()
+  const { getTotalItems: getWishlistItems } = useWishlist()
+  const { notifications, unreadCount, markAsRead } = useNotifications()
   const navigate = useNavigate()
 
   const handleSignOut = async () => {
@@ -32,6 +38,7 @@ const Header: React.FC = () => {
   }
 
   const cartItemsCount = getTotalItems()
+  const wishlistItemsCount = getWishlistItems()
 
   return (
     <header className="bg-white shadow-lg sticky top-0 z-50">
@@ -59,13 +66,102 @@ const Header: React.FC = () => {
 
           {/* Navigation Icons */}
           <div className="flex items-center space-x-4">
+            {/* Notifications */}
+            {user && (
+              <div className="relative">
+                <button
+                  onClick={() => setIsNotificationOpen(!isNotificationOpen)}
+                  className="relative p-2 text-gray-600 hover:text-blue-600 transition-colors"
+                >
+                  <Bell className="w-6 h-6" />
+                  {unreadCount > 0 && (
+                    <motion.span
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center"
+                    >
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </motion.span>
+                  )}
+                </button>
+
+                <AnimatePresence>
+                  {isNotificationOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-200 py-2 max-h-96 overflow-y-auto z-50"
+                    >
+                      <div className="px-4 py-2 border-b border-gray-200">
+                        <h3 className="font-semibold text-gray-900">Bildirimler</h3>
+                      </div>
+                      {notifications.length === 0 ? (
+                        <div className="px-4 py-8 text-center text-gray-500">
+                          Henüz bildirim yok
+                        </div>
+                      ) : (
+                        notifications.slice(0, 5).map((notification) => (
+                          <div
+                            key={notification.id}
+                            className={`px-4 py-3 hover:bg-gray-50 cursor-pointer ${
+                              !notification.isRead ? 'bg-blue-50' : ''
+                            }`}
+                            onClick={() => markAsRead(notification.id)}
+                          >
+                            <div className="flex items-start space-x-3">
+                              <div className={`w-2 h-2 rounded-full mt-2 ${
+                                !notification.isRead ? 'bg-blue-500' : 'bg-gray-300'
+                              }`} />
+                              <div className="flex-1">
+                                <p className="text-sm font-medium text-gray-900">
+                                  {notification.title}
+                                </p>
+                                <p className="text-sm text-gray-600">
+                                  {notification.message}
+                                </p>
+                                <p className="text-xs text-gray-400 mt-1">
+                                  {new Date(notification.createdAt).toLocaleDateString('tr-TR')}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                      {notifications.length > 5 && (
+                        <div className="px-4 py-2 border-t border-gray-200">
+                          <Link
+                            to="/notifications"
+                            className="text-sm text-blue-600 hover:text-blue-700"
+                          >
+                            Tüm bildirimleri gör
+                          </Link>
+                        </div>
+                      )}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            )}
+
             {/* Wishlist */}
-            <Link
-              to="/wishlist"
-              className="p-2 text-gray-600 hover:text-blue-600 transition-colors"
-            >
-              <Heart className="w-6 h-6" />
-            </Link>
+            {user && (
+              <Link
+                to="/wishlist"
+                className="relative p-2 text-gray-600 hover:text-blue-600 transition-colors"
+              >
+                <Heart className="w-6 h-6" />
+                {wishlistItemsCount > 0 && (
+                  <motion.span
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center"
+                  >
+                    {wishlistItemsCount}
+                  </motion.span>
+                )}
+              </Link>
+            )}
 
             {/* Cart */}
             <Link
@@ -95,7 +191,7 @@ const Header: React.FC = () => {
                     <User className="w-5 h-5 text-blue-600" />
                   </div>
                   <span className="hidden md:block text-sm font-medium">
-                    {userProfile?.full_name || 'Kullanıcı'}
+                    {user?.fullName || 'Kullanıcı'}
                   </span>
                 </button>
 
@@ -121,7 +217,7 @@ const Header: React.FC = () => {
                         <Package className="w-4 h-4 mr-3" />
                         Siparişlerim
                       </Link>
-                      {userProfile?.role === 'admin' && (
+                      {user?.role === 'admin' && (
                         <Link
                           to="/admin"
                           className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
@@ -130,6 +226,13 @@ const Header: React.FC = () => {
                           Admin Panel
                         </Link>
                       )}
+                      <Link
+                        to="/addresses"
+                        className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      >
+                        <Settings className="w-4 h-4 mr-3" />
+                        Adreslerim
+                      </Link>
                       <hr className="my-1" />
                       <button
                         onClick={handleSignOut}

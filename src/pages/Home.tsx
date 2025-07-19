@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { ArrowRight, Truck, Shield, Headphones, RotateCcw } from 'lucide-react'
-import { supabase } from '../lib/supabase'
+import { apiService } from '../lib/api'
 import ProductCard from '../components/ui/ProductCard'
 
 const Home: React.FC = () => {
@@ -17,25 +17,15 @@ const Home: React.FC = () => {
   const fetchHomeData = async () => {
     try {
       // Fetch featured products
-      const { data: products } = await supabase
-        .from('products')
-        .select('*')
-        .eq('is_active', true)
-        .limit(8)
-
-      if (products) {
-        setFeaturedProducts(products)
+      const productsResponse = await apiService.getFeaturedProducts()
+      if (productsResponse.success) {
+        setFeaturedProducts(productsResponse.data)
       }
 
       // Fetch categories
-      const { data: categoryData } = await supabase
-        .from('categories')
-        .select('*')
-        .is('parent_id', null)
-        .limit(6)
-
-      if (categoryData) {
-        setCategories(categoryData)
+      const categoriesResponse = await apiService.getCategories()
+      if (categoriesResponse.success) {
+        setCategories(categoriesResponse.data.slice(0, 6))
       }
     } catch (error) {
       console.error('Error fetching home data:', error)
