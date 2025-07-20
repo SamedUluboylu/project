@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
-import { supabase } from '../lib/supabase'
+import { apiService } from '../lib/api'
 import { useAuth } from './AuthContext'
 
 interface CartItem {
@@ -55,23 +55,10 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     try {
       setLoading(true)
-      const { data, error } = await supabase
-        .from('cart_items')
-        .select(`
-          *,
-          product:products (
-            id,
-            name,
-            price,
-            sale_price,
-            images,
-            stock_quantity
-          )
-        `)
-        .eq('user_id', user.id)
-
-      if (error) throw error
-      setItems(data as CartItem[])
+      const response = await apiService.getCart()
+      if (response.success) {
+        setItems(response.data || [])
+      }
     } catch (error) {
       console.error('Error fetching cart items:', error)
     } finally {
@@ -89,13 +76,8 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (existingItem) {
         await updateQuantity(existingItem.id, existingItem.quantity + quantity)
       } else {
-        const { error } = await supabase.from('cart_items').insert({
-          user_id: user.id,
-          product_id: productId,
-          quantity,
-        })
-
-        if (error) throw error
+        const response = await apiService.addToCart(productId, quantity)
+        if (!response.success) throw new Error(response.message)
         await fetchCartItems()
       }
     } catch (error: any) {
@@ -110,12 +92,8 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return
       }
 
-      const { error } = await supabase
-        .from('cart_items')
-        .update({ quantity })
-        .eq('id', itemId)
-
-      if (error) throw error
+      const response = await apiService.updateCartItem(itemId, quantity)
+      if (!response.success) throw new Error(response.message)
       await fetchCartItems()
     } catch (error: any) {
       throw new Error(error.message)
@@ -124,12 +102,8 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const removeFromCart = async (itemId: string) => {
     try {
-      const { error } = await supabase
-        .from('cart_items')
-        .delete()
-        .eq('id', itemId)
-
-      if (error) throw error
+      const response = await apiService.removeFromCart(itemId)
+      if (!response.success) throw new Error(response.message)
       await fetchCartItems()
     } catch (error: any) {
       throw new Error(error.message)
@@ -140,12 +114,8 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!user) return
 
     try {
-      const { error } = await supabase
-        .from('cart_items')
-        .delete()
-        .eq('user_id', user.id)
-
-      if (error) throw error
+      const response = await apiService.clearCart()
+      if (!response.success) throw new Error(response.message)
       setItems([])
     } catch (error: any) {
       throw new Error(error.message)
